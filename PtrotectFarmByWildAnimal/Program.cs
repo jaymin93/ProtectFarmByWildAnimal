@@ -49,7 +49,7 @@ namespace ImageClassification
             //UploadImages(trainingApi, project);
             //TrainProject(trainingApi, project);
             //PublishIteration(trainingApi, project);
-            //sTestIteration(predictionApi, project);
+            TestIteration(predictionApi, project);
             //DeleteProject(trainingApi, project);
             // </snippet_maincalls>
         }
