@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using System.Net.Http;
+using System.Diagnostics;
 
 namespace IdentifyManOrMonkeyCustomVision
 {
@@ -38,10 +39,20 @@ namespace IdentifyManOrMonkeyCustomVision
 
         private static string TableName = "helpfarmer";
 
-        private static string FuncUrl = "helpfarmer";
+        private const string playsound = "playing";
+
+        private const string status = "status";
 
         private static TimeZoneInfo INDIAN_ZONE = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
 
+        static ManorMonkeyDeatails CurrentManorMonkeyDeatails;
+
+
+        static CloudStorageAccount storageAccount = CloudStorageAccount.Parse("DefaultEndpointsProtocol=https;AccountName=deafaid;AccountKey=ch8fbsZmxgSbFGfLw5lGNXgGlRUBN+Actts2M09bIUgomisMHySQv7xuiVDbj5k//BwpVF7V6TMGniOkhFn17Q==;EndpointSuffix=core.windows.net");
+
+        static CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+
+        static CloudTable table = tableClient.GetTableReference(TableName);
 
 
         [FunctionName("ManOrMonkeyFunc")]
@@ -58,6 +69,8 @@ namespace IdentifyManOrMonkeyCustomVision
             if (response.monkey > response.man)
             {
                 await InsertIncidentgDeatilsTOAzureTable($"Please review recent image looks like monkeys are entering into the farm probability is {response.monkey:P1}", $"{StorageAccountURIWithConatinerName}{name}", log);
+
+                await InsertIncidentgDeatilsTOAzureTable(string.Empty, string.Empty, log, true);
             }
 
         }
@@ -65,34 +78,56 @@ namespace IdentifyManOrMonkeyCustomVision
 
 
 
-        public static async Task<bool> InsertIncidentgDeatilsTOAzureTable(string message, string imageurl, ILogger log)
+        public static async Task<bool> InsertIncidentgDeatilsTOAzureTable(string message, string imageurl, ILogger log, bool insertstatus = false)
         {
             try
             {
-                CloudStorageAccount storageAccount = CloudStorageAccount.Parse("DefaultEndpointsProtocol=https;AccountName=deafaid;AccountKey=ch8fbsZmxgSbFGfLw5lGNXgGlRUBN+Actts2M09bIUgomisMHySQv7xuiVDbj5k//BwpVF7V6TMGniOkhFn17Q==;EndpointSuffix=core.windows.net");
-
-                CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-
-                CloudTable table = tableClient.GetTableReference(TableName);
-
-                //can be used in situation if you are not sure table exist , in my i created table so i do not need to check this
-                //await table.CreateIfNotExistsAsync();
-
-                ManorMonkeyDeatails details;
 
 
-                details = new ManorMonkeyDeatails($"{TableName}", $"{TableName}{DateTime.Now:dd-MM-yyyy-HH-mm-ss}");
+                ManorMonkeyDeatails details= null;
 
-                details.IncidentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, INDIAN_ZONE);
+                if (insertstatus)
+                {
+                    await GetCurrentSoundPlayingStatusAsync();
 
-                details.Message = message;
-                details.ImageURL = imageurl;
+                    CurrentManorMonkeyDeatails.SoundPlayingStatus = playsound;
 
-                TableOperation insertOperation = TableOperation.Insert(details);
+                    CurrentManorMonkeyDeatails.IncidentTime = DateTime.Now;
 
-                var insertoperationresult = await table.ExecuteAsync(insertOperation);
+                    TableOperation updateoperation = TableOperation.Replace(CurrentManorMonkeyDeatails);
+                }
+                else
+                {
 
-                var sts = insertoperationresult.HttpStatusCode;
+                    details = new ManorMonkeyDeatails($"{TableName}", $"{TableName}{DateTime.Now:dd-MM-yyyy-HH-mm-ss}");
+
+                    details.IncidentTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, INDIAN_ZONE);
+
+                    details.Message = message;
+                    details.ImageURL = imageurl;
+                }
+
+
+
+                TableOperation tblops = null;
+
+                TableResult operationresult = null;
+
+                if (insertstatus)
+                {
+                    tblops = TableOperation.Replace(CurrentManorMonkeyDeatails);
+
+                    operationresult = await table.ExecuteAsync(tblops);
+                }
+                else
+                {
+                    tblops = TableOperation.Insert(details);
+
+                    operationresult = await table.ExecuteAsync(tblops);
+
+                }
+
+                var sts = operationresult.HttpStatusCode;
 
                 return true;
             }
@@ -101,10 +136,62 @@ namespace IdentifyManOrMonkeyCustomVision
                 log.LogError(ex.ToString());
                 return default;
             }
-
         }
 
 
+
+        public static async Task GetCurrentSoundPlayingStatusAsync()
+        {
+            try
+            {
+                TableQuery<ManorMonkeyDeatails> query;
+
+
+
+
+                query = new TableQuery<ManorMonkeyDeatails>().Where(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, status));
+
+
+                TableContinuationToken token = null;
+                do
+                {
+                    TableQuerySegment<ManorMonkeyDeatails> resultSegment = await table.ExecuteQuerySegmentedAsync(query, token).ConfigureAwait(false);
+                    token = resultSegment.ContinuationToken;
+
+                    CurrentManorMonkeyDeatails = resultSegment.Results.FirstOrDefault();
+
+
+                } while (token != null);
+
+
+
+            }
+            catch (Exception exp)
+            {
+                Debug.Write(exp);
+
+            }
+        }
+
+
+        //public async Task UpdateSoundPlayingStatustoAzureTable(string command)
+        //{
+        //    if (manorMonkeyDeatails == null)
+        //    {
+        //        await GetCurrentSoundPlayingStatusAsync().ConfigureAwait(false);
+        //    }
+
+        //    manorMonkeyDeatails.SoundPlayingStatus = command;
+
+        //    manorMonkeyDeatails.IncidentTime = DateTime.Now;
+
+        //    TableOperation updateoperation = TableOperation.Replace(manorMonkeyDeatails);
+
+        //    var insertoperationresult = await _linkTable.ExecuteAsync(updateoperation);
+
+        //    CurrentSoundPlayingStatus = command;
+
+        //}
 
         private static CustomVisionTrainingClient AuthTraining(string endpoint, string trainingKey)
         {
@@ -144,43 +231,6 @@ namespace IdentifyManOrMonkeyCustomVision
             return (manprob, monkeyprob);
 
         }
-
-
-        private async static void UpdateDataAsync(string funcurlx, ILogger log, bool playlionroar = true)
-        {
-            HttpClient httpClient = new HttpClient();
-
-            var response = await httpClient.GetAsync($"{FuncUrl}&{nameof(playlionroar)}={playlionroar}");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                log.LogError(response.Content.ToString());
-            }
-
-        }
-
-    }
-
-
-
-    public class ManorMonkeyDeatails : TableEntity
-    {
-        public ManorMonkeyDeatails()
-        {
-
-        }
-        public ManorMonkeyDeatails(string skey, string srow)
-        {
-            this.PartitionKey = skey;
-            this.RowKey = srow;
-        }
-        public DateTime IncidentTime { get; set; }
-
-        public string Message { get; set; }
-
-        public string ImageURL { get; set; }
-
-        public string SoundPlayingStatus { get; set; }
 
     }
 }

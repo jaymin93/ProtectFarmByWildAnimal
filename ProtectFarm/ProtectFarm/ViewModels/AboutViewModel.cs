@@ -38,11 +38,6 @@ namespace ProtectFarm.ViewModels
 
         private const string stopsound = "stopped";
 
-
-        
-
-
-
         public AboutViewModel()
         {
             Title = "Protect Farm";
