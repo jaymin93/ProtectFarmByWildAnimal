@@ -5,9 +5,9 @@ using Xamarin.Forms.Xaml;
 
 namespace ProtectFarm.Views
 {
-    public partial class AboutPage : ContentPage
+    public partial class ProtectFarmPage : ContentPage
     {
-        public AboutPage()
+        public ProtectFarmPage()
         {
             InitializeComponent();
         }

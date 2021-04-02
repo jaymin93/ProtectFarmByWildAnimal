@@ -100,10 +100,7 @@ namespace ProtectFarm.ViewModels
             }
         }
 
-        private async void OnAddItem(object obj)
-        {
-            await Shell.Current.GoToAsync(nameof(NewItemPage));
-        }
+        
 
         async void OnItemSelected(ManorMonkeyDeatails item)
         {

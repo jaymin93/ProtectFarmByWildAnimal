@@ -12,7 +12,7 @@ using ProtectFarm.Models;
 
 namespace ProtectFarm.ViewModels
 {
-    public class AboutViewModel : BaseViewModel
+    public class ProtectFarmViewModel : BaseViewModel
     {
 
         private string curretstatus;
@@ -38,7 +38,7 @@ namespace ProtectFarm.ViewModels
 
         private const string stopsound = "stopped";
 
-        public AboutViewModel()
+        public ProtectFarmViewModel()
         {
             Title = "Protect Farm";
             PlaySoundCommand = new Command(async () => await UpdateSoundPlayingStatustoAzureTable(playsound).ConfigureAwait(false));
